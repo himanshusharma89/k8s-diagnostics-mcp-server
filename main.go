@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -419,7 +420,12 @@ func main() {
 			"raw_logs":     logText,
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("%+v", result)), nil
+		jsonBytes, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError("failed to serialize result to JSON"), nil
+		}
+
+		return mcp.NewToolResultText(string(jsonBytes)), nil
 	})
 
 	// Add resource to provide troubleshooting guides
@@ -468,9 +474,15 @@ func main() {
 	`
 
 	guideResource := mcp.NewResource("k8s://troubleshooting/common-issues", "Common Kubernetes troubleshooting guide", mcp.WithMIMEType("text/markdown"))
-	s.AddResource(guideResource, server.ResourceHandlerFunc(func(ctx context.Context) (*server.ResourceResult, error) {
-		return mcp.NewToolResultText(fmt.Sprintf("%+v", troubleshootingGuide)), nil
-	}))
+	s.AddResource(guideResource, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+    return []mcp.ResourceContents{
+        mcp.TextResourceContents{
+            URI:      request.Params.URI,
+            MIMEType: "text/markdown",
+            Text:     troubleshootingGuide,
+        },
+    }, nil
+})
 
 	if err := server.ServeStdio(s); err != nil {
 		log.Fatalf("Server failed: %v", err)
