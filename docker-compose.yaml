@@ -1,0 +1,47 @@
+# docker-compose.yml - For local testing with kind cluster
+version: '3.8'
+
+services:
+  # Kind Kubernetes cluster
+  kind-cluster:
+    image: kindest/node:v1.28.0
+    container_name: k8s-diagnostics-kind
+    privileged: true
+    ports:
+      - "6443:6443"
+      - "30000-30100:30000-30100"
+    volumes:
+      - kind-data:/var/lib/containerd
+    command: |
+      bash -c "
+        systemctl start containerd &&
+        systemctl start kubelet &&
+        tail -f /dev/null
+      "
+
+  # Test application pods
+  test-app-good:
+    image: nginx:alpine
+    container_name: test-app-good
+    ports:
+      - "8080:80"
+    environment:
+      - APP_NAME=good-app
+    
+  test-app-bad:
+    image: nginx:alpine
+    container_name: test-app-bad
+    ports:
+      - "8081:80"
+    environment:
+      - APP_NAME=bad-app
+    command: |
+      sh -c "
+        echo 'Starting bad app that will crash...' &&
+        sleep 5 &&
+        exit 1
+      "
+    restart: unless-stopped
+
+volumes:
+  kind-data:

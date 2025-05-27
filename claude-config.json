@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "k8s-diagnostics": {
+      "command": "./bin/k8s-diagnostics-server",
+      "args": [],
+      "env": {
+        "KUBECONFIG": "/path/to/your/kubeconfig"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/directory"],
+      "env": {}
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-github-token-here"
+      }
+    }
+  }
+}
