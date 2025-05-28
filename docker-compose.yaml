@@ -1,47 +1,34 @@
-# docker-compose.yml - For local testing with kind cluster
 version: '3.8'
-
 services:
-  # Kind Kubernetes cluster
+  # Kind cluster in Docker
   kind-cluster:
-    image: kindest/node:v1.28.0
-    container_name: k8s-diagnostics-kind
+    image: kindest/node:v1.27.3
+    container_name: k8s-mcp-kind
     privileged: true
     ports:
-      - "6443:6443"
-      - "30000-30100:30000-30100"
+      - "6443:6443"  # Kubernetes API
     volumes:
-      - kind-data:/var/lib/containerd
-    command: |
-      bash -c "
-        systemctl start containerd &&
-        systemctl start kubelet &&
-        tail -f /dev/null
-      "
+      - /var/lib/docker
+    networks:
+      - k8s-mcp
 
-  # Test application pods
-  test-app-good:
-    image: nginx:alpine
-    container_name: test-app-good
-    ports:
-      - "8080:80"
-    environment:
-      - APP_NAME=good-app
-    
-  test-app-bad:
-    image: nginx:alpine
-    container_name: test-app-bad
-    ports:
-      - "8081:80"
-    environment:
-      - APP_NAME=bad-app
-    command: |
-      sh -c "
-        echo 'Starting bad app that will crash...' &&
-        sleep 5 &&
-        exit 1
-      "
-    restart: unless-stopped
+  # Test workloads
+  nginx-healthy:
+    image: nginx:latest
+    container_name: test-nginx-healthy
+    networks:
+      - k8s-mcp
+    depends_on:
+      - kind-cluster
 
-volumes:
-  kind-data:
+  nginx-problematic:
+    image: nginx:nonexistent-tag
+    container_name: test-nginx-problematic
+    networks:
+      - k8s-mcp
+    depends_on:
+      - kind-cluster
+
+networks:
+  k8s-mcp:
+    driver: bridge
