@@ -56,6 +56,19 @@ type LogAnalysis struct {
 	WarningCount int      `json:"warning_count"`
 }
 
+// PodResourceInfo holds resource usage and status info for a pod
+type PodResourceInfo struct {
+	Name            string  `json:"name"`
+	Namespace       string  `json:"namespace"`
+	CPURequest      string  `json:"cpu_request"`
+	MemoryRequest   string  `json:"memory_request"`
+	CPULimit        string  `json:"cpu_limit"`
+	MemoryLimit     string  `json:"memory_limit"`
+	RestartCount    int32   `json:"restart_count"`
+	Status          string  `json:"status"`
+	HasResourceIssues bool  `json:"has_resource_issues"`
+}
+
 func NewK8sDiagnosticsServer() (*K8sDiagnosticsServer, error) {
 	var config *rest.Config
 	var err error
@@ -430,6 +443,233 @@ func (s *K8sDiagnosticsServer) getWorkloadRecommendations(ctx context.Context, n
 	return recommendations, nil
 }
 
+// Additional exploratory tools to add to the existing K8s diagnostics MCP server
+
+// Tool: Find and diagnose problematic pods
+func (s *K8sDiagnosticsServer) findProblematicPods(ctx context.Context, namespace string, criteria string) ([]PodDiagnostic, error) {
+	var pods *corev1.PodList
+	var err error
+
+	if namespace == "" || namespace == "all" {
+		pods, err = s.clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	} else {
+		pods, err = s.clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	var problematicPods []PodDiagnostic
+	
+	for _, pod := range pods.Items {
+		// Skip system namespaces unless specifically requested
+		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") || 
+			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" || 
+			pod.Namespace == "kube-node-lease") {
+			continue
+		}
+
+		isProblem := false
+		
+		switch criteria {
+		case "failing", "failed", "error":
+			isProblem = pod.Status.Phase == "Failed" || pod.Status.Phase == "Pending"
+		case "restarting", "restart":
+			for _, cs := range pod.Status.ContainerStatuses {
+				if cs.RestartCount > 3 {
+					isProblem = true
+					break
+				}
+			}
+		case "not-ready", "unready":
+			for _, cs := range pod.Status.ContainerStatuses {
+				if !cs.Ready {
+					isProblem = true
+					break
+				}
+			}
+		case "resource-issues":
+			// Check for resource-related issues
+			for _, cs := range pod.Status.ContainerStatuses {
+				if cs.State.Waiting != nil && 
+					(strings.Contains(cs.State.Waiting.Reason, "Memory") || 
+					 strings.Contains(cs.State.Waiting.Reason, "CPU")) {
+					isProblem = true
+					break
+				}
+			}
+		case "image-issues":
+			for _, cs := range pod.Status.ContainerStatuses {
+				if cs.State.Waiting != nil && 
+					(cs.State.Waiting.Reason == "ImagePullBackOff" || 
+					 cs.State.Waiting.Reason == "ErrImagePull") {
+					isProblem = true
+					break
+				}
+			}
+		default: // "all" or any other criteria - find any problematic pods
+			isProblem = pod.Status.Phase != "Running" && pod.Status.Phase != "Succeeded"
+			if !isProblem {
+				for _, cs := range pod.Status.ContainerStatuses {
+					if cs.RestartCount > 3 || !cs.Ready {
+						isProblem = true
+						break
+					}
+				}
+			}
+		}
+
+		if isProblem {
+			diagnostic, err := s.diagnosePod(ctx, pod.Namespace, pod.Name)
+			if err == nil {
+				problematicPods = append(problematicPods, *diagnostic)
+			}
+		}
+	}
+
+	return problematicPods, nil
+}
+
+// Tool: Search pods by name pattern
+func (s *K8sDiagnosticsServer) searchPods(ctx context.Context, namePattern string, namespace string) ([]PodDiagnostic, error) {
+	var pods *corev1.PodList
+	var err error
+
+	if namespace == "" || namespace == "all" {
+		pods, err = s.clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	} else {
+		pods, err = s.clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	var matchingPods []PodDiagnostic
+	pattern := strings.ToLower(namePattern)
+	
+	for _, pod := range pods.Items {
+		// Skip system namespaces unless specifically requested
+		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") || 
+			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" || 
+			pod.Namespace == "kube-node-lease") {
+			continue
+		}
+
+		podName := strings.ToLower(pod.Name)
+		podNamespace := strings.ToLower(pod.Namespace)
+		
+		// Match against pod name, namespace, or labels
+		if strings.Contains(podName, pattern) || 
+		   strings.Contains(podNamespace, pattern) {
+			diagnostic, err := s.diagnosePod(ctx, pod.Namespace, pod.Name)
+			if err == nil {
+				matchingPods = append(matchingPods, *diagnostic)
+			}
+		} else {
+			// Check labels
+			for key, value := range pod.Labels {
+				if strings.Contains(strings.ToLower(key), pattern) || 
+				   strings.Contains(strings.ToLower(value), pattern) {
+					diagnostic, err := s.diagnosePod(ctx, pod.Namespace, pod.Name)
+					if err == nil {
+						matchingPods = append(matchingPods, *diagnostic)
+					}
+					break
+				}
+			}
+		}
+	}
+
+	return matchingPods, nil
+}
+
+// Tool: Get resource usage across pods
+func (s *K8sDiagnosticsServer) getResourceUsage(ctx context.Context, namespace string, sortBy string) ([]PodResourceInfo, error) {
+	var pods *corev1.PodList
+	var err error
+
+	if namespace == "" || namespace == "all" {
+		pods, err = s.clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	} else {
+		pods, err = s.clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	var resourceInfo []PodResourceInfo
+	
+	for _, pod := range pods.Items {
+		// Skip system namespaces unless specifically requested
+		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") || 
+			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" || 
+			pod.Namespace == "kube-node-lease") {
+			continue
+		}
+
+		info := PodResourceInfo{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Status:    string(pod.Status.Phase),
+		}
+
+		totalRestarts := int32(0)
+		hasResourceIssues := false
+
+		// Aggregate resource information from all containers
+		for _, container := range pod.Spec.Containers {
+			if container.Resources.Requests != nil {
+				if cpu := container.Resources.Requests.Cpu(); cpu != nil {
+					info.CPURequest += cpu.String() + " "
+				}
+				if memory := container.Resources.Requests.Memory(); memory != nil {
+					info.MemoryRequest += memory.String() + " "
+				}
+			}
+			if container.Resources.Limits != nil {
+				if cpu := container.Resources.Limits.Cpu(); cpu != nil {
+					info.CPULimit += cpu.String() + " "
+				}
+				if memory := container.Resources.Limits.Memory(); memory != nil {
+					info.MemoryLimit += memory.String() + " "
+				}
+			}
+
+			// Check if container has no resource configuration
+			if container.Resources.Requests == nil && container.Resources.Limits == nil {
+				hasResourceIssues = true
+			}
+		}
+
+		// Get restart count
+		for _, cs := range pod.Status.ContainerStatuses {
+			totalRestarts += cs.RestartCount
+			
+			// Check for resource-related waiting states
+			if cs.State.Waiting != nil {
+				reason := cs.State.Waiting.Reason
+				if strings.Contains(reason, "Memory") || strings.Contains(reason, "CPU") || 
+				   reason == "OOMKilled" {
+					hasResourceIssues = true
+				}
+			}
+		}
+
+		info.RestartCount = totalRestarts
+		info.HasResourceIssues = hasResourceIssues
+		
+		resourceInfo = append(resourceInfo, info)
+	}
+
+	// TODO: Implement sorting based on sortBy parameter
+	// Could sort by restart count, resource usage, etc.
+
+	return resourceInfo, nil
+}
+
 func main() {
 	s := server.NewMCPServer(
 		"K8s Diagnostics MCP Server",
@@ -602,6 +842,132 @@ func main() {
 		return mcp.NewToolResultText(string(jsonBytes)), nil
 	})
 
+	// Tool: Find problematic pods
+	findProblematicTool := mcp.NewTool("find_problematic_pods",
+		mcp.WithDescription("Find and diagnose pods with issues (failing, restarting, not ready, etc.)"),
+		mcp.WithString("namespace", mcp.Description("Namespace to search (default: all non-system namespaces)")),
+		mcp.WithString("criteria", mcp.Description("Type of problems to find: failing, restarting, not-ready, resource-issues, image-issues, or all (default: all)")),
+	)
+
+	s.AddTool(findProblematicTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := req.GetString("namespace", "")
+		criteria := req.GetString("criteria", "all")
+
+		result, err := diagnostics.findProblematicPods(ctx, namespace, criteria)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("failed to find problematic pods", err), nil
+		}
+
+		response := map[string]interface{}{
+			"search_criteria": criteria,
+			"namespace": namespace,
+			"problem_count": len(result),
+			"problematic_pods": result,
+		}
+
+		jsonBytes, _ := json.MarshalIndent(response, "", "  ")
+		return mcp.NewToolResultText(string(jsonBytes)), nil
+	})
+
+	// Tool: Search pods by pattern
+	searchPodsTool := mcp.NewTool("search_pods",
+		mcp.WithDescription("Search for pods by name pattern, namespace, or labels and get their diagnostics"),
+		mcp.WithString("pattern", mcp.Required(), mcp.Description("Search pattern (pod name, namespace, or label value)")),
+		mcp.WithString("namespace", mcp.Description("Namespace to search (default: all non-system namespaces)")),
+	)
+
+	s.AddTool(searchPodsTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		pattern, err := req.RequireString("pattern")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		
+		namespace := req.GetString("namespace", "")
+
+		result, err := diagnostics.searchPods(ctx, pattern, namespace)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("pod search failed", err), nil
+		}
+
+		response := map[string]interface{}{
+			"search_pattern": pattern,
+			"namespace": namespace,
+			"matches_found": len(result),
+			"matching_pods": result,
+		}
+
+		jsonBytes, _ := json.MarshalIndent(response, "", "  ")
+		return mcp.NewToolResultText(string(jsonBytes)), nil
+	})
+
+	// Tool: Get resource usage overview
+	resourceUsageTool := mcp.NewTool("get_resource_usage",
+		mcp.WithDescription("Get resource usage overview for pods to identify resource-related issues"),
+		mcp.WithString("namespace", mcp.Description("Namespace to analyze (default: all non-system namespaces)")),
+		mcp.WithString("sort_by", mcp.Description("Sort results by: restarts, cpu, memory (default: restarts)")),
+	)
+
+	s.AddTool(resourceUsageTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := req.GetString("namespace", "")
+		sortBy := req.GetString("sort_by", "restarts")
+
+		result, err := diagnostics.getResourceUsage(ctx, namespace, sortBy)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("resource usage analysis failed", err), nil
+		}
+
+		response := map[string]interface{}{
+			"namespace": namespace,
+			"sort_by": sortBy,
+			"pod_count": len(result),
+			"resource_usage": result,
+		}
+
+		jsonBytes, _ := json.MarshalIndent(response, "", "  ")
+		return mcp.NewToolResultText(string(jsonBytes)), nil
+	})
+
+	// Tool: Quick cluster triage
+	triageTool := mcp.NewTool("quick_triage",
+		mcp.WithDescription("Perform quick cluster triage to identify immediate issues across all namespaces"),
+	)
+
+	s.AddTool(triageTool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Get cluster health
+		clusterHealth, err := diagnostics.analyzeClusterHealth(ctx)
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("cluster health check failed", err), nil
+		}
+
+		// Find critical issues
+		criticalPods, err := diagnostics.findProblematicPods(ctx, "", "failing")
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("failed to find critical pods", err), nil
+		}
+
+		// Find high restart pods  
+		restartingPods, err := diagnostics.findProblematicPods(ctx, "", "restarting")
+		if err != nil {
+			return mcp.NewToolResultErrorFromErr("failed to find restarting pods", err), nil
+		}
+
+		response := map[string]interface{}{
+			"timestamp": time.Now(),
+			"cluster_health": clusterHealth,
+			"critical_pods": criticalPods,
+			"restarting_pods": restartingPods,
+			"immediate_actions": []string{
+				"Check critical/failing pods first",
+				"Investigate high restart count pods", 
+				"Review cluster resource availability",
+				"Check node health status",
+			},
+		}
+
+		jsonBytes, _ := json.MarshalIndent(response, "", "  ")
+		return mcp.NewToolResultText(string(jsonBytes)), nil
+	})
+
 	// Add comprehensive troubleshooting guide resource
 	troubleshootingGuide := `# Kubernetes Diagnostics MCP Server Guide
 
@@ -646,6 +1012,35 @@ Lists pods with status information:
 - Restart counts
 - Age information
 - Namespace filtering
+
+### 6. find_problematic_pods
+Finds pods with specific issues:
+- Failing pods
+- Restarting pods
+- Not ready pods
+- Resource-related issues
+- Image pull issues
+- All problematic pods
+- Provides diagnostics for identified pods
+
+### 7. search_pods
+Searches for pods by name pattern, namespace, or labels:
+- Find pods matching a specific name or label
+- Get diagnostics for matching pods
+
+### 8. get_resource_usage
+Analyzes resource usage across pods:
+- CPU and memory requests/limits
+- Restart counts
+- Resource issues detection
+- Sorting options for resource usage
+
+### 9. quick_triage
+Performs quick cluster triage:
+- Cluster health overview
+- Critical/failing pod identification
+- High restart pod detection
+- Immediate actions for cluster issues
 
 ## Integration with Other MCP Servers
 
