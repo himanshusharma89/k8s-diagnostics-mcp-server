@@ -1,23 +1,21 @@
 # Kubernetes Diagnostics MCP Server
 
-A Dart-based Model Context Protocol (MCP) server for Kubernetes diagnostics. This server provides tools for monitoring and troubleshooting Kubernetes clusters.
+A Model Context Protocol (MCP) server built with Dart that provides Kubernetes diagnostic tools. This server exposes various Kubernetes diagnostic capabilities through a standardized MCP interface.
 
 ## Features
 
-- Get cluster status and health metrics
-- Retrieve pod logs
-- Detect crash loop pods
-- Summarize cluster events
+- `get_cluster_status`: Get overall cluster health and status
+- `get_pod_logs`: Retrieve logs from specific pods
+- `detect_crash_loop_pods`: Identify pods stuck in crash loop
+- `summarize_events`: Get a summary of Kubernetes events
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
-
-- Dart SDK (>=3.0.0)
+- Dart SDK >= 3.0.0
 - Kubernetes cluster access
-- kubectl configured
+- kubeconfig file
 
-### Installation
+## Installation
 
 1. Clone the repository:
 ```bash
@@ -30,64 +28,42 @@ cd k8s-diagnostics-mcp-server
 dart pub get
 ```
 
-3. Run the server:
+## Usage
+
+Run the server:
 ```bash
-dart run bin/server.dart
+dart run bin/k8s_diagnostics_server.dart
 ```
 
-The server will start on port 8080 by default. You can change the port by setting the `PORT` environment variable.
+Options:
+- `--port`: Server port (default: 8080)
+- `--kubeconfig`: Path to kubeconfig file (default: ~/.kube/config)
+- `--help`: Show help message
 
-## API Endpoints
+## MCP Tools
 
-### Get Cluster Status
-```http
-POST /tools/get_cluster_status
-```
+### get_cluster_status
+Returns the current status of the Kubernetes cluster, including node and pod information.
 
-### Get Pod Logs
-```http
-POST /tools/get_pod_logs
-{
-  "namespace": "default",
-  "pod_name": "my-pod",
-  "container_name": "main",
-  "tail_lines": 100
-}
-```
+### get_pod_logs
+Retrieves logs from a specific pod.
 
-### Detect Crash Loop Pods
-```http
-POST /tools/detect_crash_loop_pods
-{
-  "namespace": "default"
-}
-```
+Parameters:
+- `namespace`: Pod namespace
+- `pod_name`: Name of the pod
+- `container`: (Optional) Container name
 
-### Summarize Events
-```http
-POST /tools/summarize_events
-{
-  "namespace": "default",
-  "duration": "1h"
-}
-```
+### detect_crash_loop_pods
+Identifies pods that are stuck in a crash loop state.
 
-## Development
+### summarize_events
+Provides a summary of Kubernetes events, optionally filtered by namespace.
 
-### Running Tests
-```bash
-dart test
-```
-
-### Building
-```bash
-dart compile exe bin/server.dart -o k8s-diagnostics-mcp-server
-```
-
-## License
-
-MIT License
+Parameters:
+- `namespace`: (Optional) Filter events by namespace
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
