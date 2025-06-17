@@ -1,21 +1,23 @@
 # Kubernetes Diagnostics MCP Server
 
-A Model Context Protocol (MCP) server built with Dart that provides Kubernetes diagnostic tools. This server exposes various Kubernetes diagnostic capabilities through a standardized MCP interface.
+A powerful Kubernetes diagnostics server built with Dart that provides real-time insights into your Kubernetes cluster through an MCP (Model-Controller-Provider) interface.
 
 ## Features
 
-- `get_cluster_status`: Get overall cluster health and status
-- `get_pod_logs`: Retrieve logs from specific pods
-- `detect_crash_loop_pods`: Identify pods stuck in crash loop
-- `summarize_events`: Get a summary of Kubernetes events
+- **Cluster Status Monitoring**: Get real-time status of your Kubernetes cluster
+- **Pod Logs**: Retrieve logs from any pod in your cluster
+- **Crash Loop Detection**: Automatically detect pods stuck in crash loops
+- **Event Summarization**: Get a summary of recent cluster events
 
-## Prerequisites
+## Getting Started
 
-- Dart SDK >= 3.0.0
+### Prerequisites
+
+- Dart SDK (>=3.0.0)
 - Kubernetes cluster access
-- kubeconfig file
+- kubectl configured with cluster access
 
-## Installation
+### Installation
 
 1. Clone the repository:
 ```bash
@@ -28,42 +30,35 @@ cd k8s-diagnostics-mcp-server
 dart pub get
 ```
 
-## Usage
-
-Run the server:
+3. Run the server:
 ```bash
-dart run bin/k8s_diagnostics_server.dart
+dart run bin/k8s_diagnostics_mcp_server.dart
 ```
 
-Options:
-- `--port`: Server port (default: 8080)
-- `--kubeconfig`: Path to kubeconfig file (default: ~/.kube/config)
-- `--help`: Show help message
+The server will start on port 8080 by default.
 
-## MCP Tools
+## Available Tools
 
 ### get_cluster_status
-Returns the current status of the Kubernetes cluster, including node and pod information.
+Retrieves the current status of your Kubernetes cluster, including node and pod information.
 
 ### get_pod_logs
-Retrieves logs from a specific pod.
+Fetches logs from a specific pod in your cluster.
 
 Parameters:
-- `namespace`: Pod namespace
-- `pod_name`: Name of the pod
-- `container`: (Optional) Container name
+- `namespace` (optional): The namespace containing the pod (defaults to 'default')
+- `pod_name`: The name of the pod to fetch logs from
 
 ### detect_crash_loop_pods
-Identifies pods that are stuck in a crash loop state.
+Identifies pods that are stuck in crash loops by analyzing their restart counts.
 
 ### summarize_events
-Provides a summary of Kubernetes events, optionally filtered by namespace.
-
-Parameters:
-- `namespace`: (Optional) Filter events by namespace
+Provides a summary of recent cluster events from the last 24 hours.
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
