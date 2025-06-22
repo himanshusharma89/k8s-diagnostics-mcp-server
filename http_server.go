@@ -664,10 +664,13 @@ func (s *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	fmt.Println(">>> Starting k8s-diagnostics-mcp-server-http main()")
 	// Check if we should run as HTTP server or MCP server
 	if os.Getenv("HTTP_MODE") == "true" {
+		fmt.Println(">>> Starting http mode")
 		runHTTPServer()
 	} else {
+		fmt.Println(">>> Starting mcp mode")
 		runMCPServer()
 	}
 }

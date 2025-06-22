@@ -15,7 +15,7 @@ build:
 # Build the HTTP server (for web hosting)
 build-http:
 	@echo "Building K8s MCP Server for HTTP hosting..."
-	HTTP_MODE=true go build -o bin/k8s-diagnostics-mcp-server-http .
+	HTTP_MODE=false go build -o bin/k8s-diagnostics-mcp-server-http .
 
 # Create Kind cluster
 cluster-up:

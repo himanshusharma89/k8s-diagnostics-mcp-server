@@ -11,12 +11,8 @@
   },
   "servers": [
     {
-      "url": "https://k8s-diagnostics-mcp-server.onrender.com",
+      "url": " https://051d-157-20-14-43.ngrok-free.app",
       "description": "Production server on Render"
-    },
-    {
-      "url": "http://localhost:8080",
-      "description": "Local development server"
     }
   ],
   "paths": {
