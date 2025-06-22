@@ -58,15 +58,15 @@ type LogAnalysis struct {
 
 // PodResourceInfo holds resource usage and status info for a pod
 type PodResourceInfo struct {
-	Name            string  `json:"name"`
-	Namespace       string  `json:"namespace"`
-	CPURequest      string  `json:"cpu_request"`
-	MemoryRequest   string  `json:"memory_request"`
-	CPULimit        string  `json:"cpu_limit"`
-	MemoryLimit     string  `json:"memory_limit"`
-	RestartCount    int32   `json:"restart_count"`
-	Status          string  `json:"status"`
-	HasResourceIssues bool  `json:"has_resource_issues"`
+	Name              string `json:"name"`
+	Namespace         string `json:"namespace"`
+	CPURequest        string `json:"cpu_request"`
+	MemoryRequest     string `json:"memory_request"`
+	CPULimit          string `json:"cpu_limit"`
+	MemoryLimit       string `json:"memory_limit"`
+	RestartCount      int32  `json:"restart_count"`
+	Status            string `json:"status"`
+	HasResourceIssues bool   `json:"has_resource_issues"`
 }
 
 func NewK8sDiagnosticsServer() (*K8sDiagnosticsServer, error) {
@@ -118,10 +118,10 @@ func (s *K8sDiagnosticsServer) diagnosePod(ctx context.Context, namespace, podNa
 	// Analyze container statuses
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		diagnostic.RestartCount += containerStatus.RestartCount
-		
+
 		if containerStatus.RestartCount > 5 {
-			diagnostic.Issues = append(diagnostic.Issues, 
-				fmt.Sprintf("Container %s has high restart count: %d", 
+			diagnostic.Issues = append(diagnostic.Issues,
+				fmt.Sprintf("Container %s has high restart count: %d",
 					containerStatus.Name, containerStatus.RestartCount))
 			diagnostic.Suggestions = append(diagnostic.Suggestions,
 				"Check container logs and resource limits")
@@ -137,7 +137,7 @@ func (s *K8sDiagnosticsServer) diagnosePod(ctx context.Context, namespace, podNa
 			reason := containerStatus.State.Waiting.Reason
 			diagnostic.Issues = append(diagnostic.Issues,
 				fmt.Sprintf("Container %s is waiting: %s", containerStatus.Name, reason))
-			
+
 			switch reason {
 			case "ImagePullBackOff", "ErrImagePull":
 				diagnostic.Suggestions = append(diagnostic.Suggestions,
@@ -201,7 +201,7 @@ func (s *K8sDiagnosticsServer) analyzeClusterHealth(ctx context.Context) (*Clust
 
 	health.NodeCount = len(nodes.Items)
 	unhealthyNodes := []string{}
-	
+
 	for _, node := range nodes.Items {
 		ready := false
 		for _, condition := range node.Status.Conditions {
@@ -231,16 +231,16 @@ func (s *K8sDiagnosticsServer) analyzeClusterHealth(ctx context.Context) (*Clust
 
 	problemPods := 0
 	totalPods := 0
-	
+
 	for _, pod := range pods.Items {
 		// Skip completed jobs and succeeded pods
 		if pod.Status.Phase == "Succeeded" {
 			continue
 		}
-		
+
 		totalPods++
 		hasIssues := false
-		
+
 		for _, containerStatus := range pod.Status.ContainerStatuses {
 			if containerStatus.RestartCount > 3 || !containerStatus.Ready {
 				hasIssues = true
@@ -269,10 +269,10 @@ func (s *K8sDiagnosticsServer) analyzeClusterHealth(ctx context.Context) (*Clust
 	// Generate recommendations
 	if float64(health.HealthyNodes)/float64(health.NodeCount) < 0.8 {
 		health.Recommendations = append(health.Recommendations,
-			fmt.Sprintf("Cluster has %d unhealthy nodes: %s", 
+			fmt.Sprintf("Cluster has %d unhealthy nodes: %s",
 				len(unhealthyNodes), strings.Join(unhealthyNodes, ", ")))
 	}
-	
+
 	if problemPods > 10 {
 		health.Recommendations = append(health.Recommendations,
 			"High number of problematic pods detected - investigate cluster resource constraints")
@@ -326,7 +326,7 @@ func (s *K8sDiagnosticsServer) analyzePodLogs(ctx context.Context, namespace, po
 
 	for _, line := range logLines {
 		lowerLine := strings.ToLower(line)
-		
+
 		// Check for errors
 		for _, pattern := range errorPatterns {
 			if strings.Contains(lowerLine, pattern) {
@@ -352,7 +352,7 @@ func (s *K8sDiagnosticsServer) analyzePodLogs(ctx context.Context, namespace, po
 				case "segmentation fault":
 					suggestion = "Application crash detected - review application code and dependencies"
 				}
-				
+
 				if suggestion != "" && !suggestionMap[suggestion] {
 					analysis.Suggestions = append(analysis.Suggestions, suggestion)
 					suggestionMap[suggestion] = true
@@ -372,10 +372,10 @@ func (s *K8sDiagnosticsServer) analyzePodLogs(ctx context.Context, namespace, po
 
 	// Add general suggestions based on error count
 	if analysis.ErrorCount > 10 {
-		analysis.Suggestions = append(analysis.Suggestions, 
+		analysis.Suggestions = append(analysis.Suggestions,
 			"High error rate detected - consider reviewing application stability")
 	}
-	
+
 	if analysis.WarningCount > 5 {
 		analysis.Suggestions = append(analysis.Suggestions,
 			"Multiple warnings detected - review application configuration")
@@ -396,7 +396,7 @@ func (s *K8sDiagnosticsServer) getWorkloadRecommendations(ctx context.Context, n
 	for _, deployment := range deployments.Items {
 		hasLimits := false
 		hasRequests := false
-		
+
 		for _, container := range deployment.Spec.Template.Spec.Containers {
 			if container.Resources.Limits != nil {
 				hasLimits = true
@@ -405,23 +405,23 @@ func (s *K8sDiagnosticsServer) getWorkloadRecommendations(ctx context.Context, n
 				hasRequests = true
 			}
 		}
-		
+
 		if !hasLimits {
 			recommendations = append(recommendations,
-				fmt.Sprintf("Deployment %s/%s should have resource limits", 
+				fmt.Sprintf("Deployment %s/%s should have resource limits",
 					deployment.Namespace, deployment.Name))
 		}
-		
+
 		if !hasRequests {
 			recommendations = append(recommendations,
-				fmt.Sprintf("Deployment %s/%s should have resource requests", 
+				fmt.Sprintf("Deployment %s/%s should have resource requests",
 					deployment.Namespace, deployment.Name))
 		}
 
 		// Check replica count
 		if deployment.Spec.Replicas != nil && *deployment.Spec.Replicas == 1 {
 			recommendations = append(recommendations,
-				fmt.Sprintf("Deployment %s/%s has only 1 replica - consider scaling for HA", 
+				fmt.Sprintf("Deployment %s/%s has only 1 replica - consider scaling for HA",
 					deployment.Namespace, deployment.Name))
 		}
 
@@ -461,17 +461,17 @@ func (s *K8sDiagnosticsServer) findProblematicPods(ctx context.Context, namespac
 	}
 
 	var problematicPods []PodDiagnostic
-	
+
 	for _, pod := range pods.Items {
 		// Skip system namespaces unless specifically requested
-		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") || 
-			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" || 
+		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") ||
+			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" ||
 			pod.Namespace == "kube-node-lease") {
 			continue
 		}
 
 		isProblem := false
-		
+
 		switch criteria {
 		case "failing", "failed", "error":
 			isProblem = pod.Status.Phase == "Failed" || pod.Status.Phase == "Pending"
@@ -492,18 +492,18 @@ func (s *K8sDiagnosticsServer) findProblematicPods(ctx context.Context, namespac
 		case "resource-issues":
 			// Check for resource-related issues
 			for _, cs := range pod.Status.ContainerStatuses {
-				if cs.State.Waiting != nil && 
-					(strings.Contains(cs.State.Waiting.Reason, "Memory") || 
-					 strings.Contains(cs.State.Waiting.Reason, "CPU")) {
+				if cs.State.Waiting != nil &&
+					(strings.Contains(cs.State.Waiting.Reason, "Memory") ||
+						strings.Contains(cs.State.Waiting.Reason, "CPU")) {
 					isProblem = true
 					break
 				}
 			}
 		case "image-issues":
 			for _, cs := range pod.Status.ContainerStatuses {
-				if cs.State.Waiting != nil && 
-					(cs.State.Waiting.Reason == "ImagePullBackOff" || 
-					 cs.State.Waiting.Reason == "ErrImagePull") {
+				if cs.State.Waiting != nil &&
+					(cs.State.Waiting.Reason == "ImagePullBackOff" ||
+						cs.State.Waiting.Reason == "ErrImagePull") {
 					isProblem = true
 					break
 				}
@@ -548,21 +548,21 @@ func (s *K8sDiagnosticsServer) searchPods(ctx context.Context, namePattern strin
 
 	var matchingPods []PodDiagnostic
 	pattern := strings.ToLower(namePattern)
-	
+
 	for _, pod := range pods.Items {
 		// Skip system namespaces unless specifically requested
-		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") || 
-			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" || 
+		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") ||
+			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" ||
 			pod.Namespace == "kube-node-lease") {
 			continue
 		}
 
 		podName := strings.ToLower(pod.Name)
 		podNamespace := strings.ToLower(pod.Namespace)
-		
+
 		// Match against pod name, namespace, or labels
-		if strings.Contains(podName, pattern) || 
-		   strings.Contains(podNamespace, pattern) {
+		if strings.Contains(podName, pattern) ||
+			strings.Contains(podNamespace, pattern) {
 			diagnostic, err := s.diagnosePod(ctx, pod.Namespace, pod.Name)
 			if err == nil {
 				matchingPods = append(matchingPods, *diagnostic)
@@ -570,8 +570,8 @@ func (s *K8sDiagnosticsServer) searchPods(ctx context.Context, namePattern strin
 		} else {
 			// Check labels
 			for key, value := range pod.Labels {
-				if strings.Contains(strings.ToLower(key), pattern) || 
-				   strings.Contains(strings.ToLower(value), pattern) {
+				if strings.Contains(strings.ToLower(key), pattern) ||
+					strings.Contains(strings.ToLower(value), pattern) {
 					diagnostic, err := s.diagnosePod(ctx, pod.Namespace, pod.Name)
 					if err == nil {
 						matchingPods = append(matchingPods, *diagnostic)
@@ -601,11 +601,11 @@ func (s *K8sDiagnosticsServer) getResourceUsage(ctx context.Context, namespace s
 	}
 
 	var resourceInfo []PodResourceInfo
-	
+
 	for _, pod := range pods.Items {
 		// Skip system namespaces unless specifically requested
-		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") || 
-			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" || 
+		if namespace == "" && (strings.HasPrefix(pod.Namespace, "kube-") ||
+			pod.Namespace == "kube-system" || pod.Namespace == "kube-public" ||
 			pod.Namespace == "kube-node-lease") {
 			continue
 		}
@@ -647,12 +647,12 @@ func (s *K8sDiagnosticsServer) getResourceUsage(ctx context.Context, namespace s
 		// Get restart count
 		for _, cs := range pod.Status.ContainerStatuses {
 			totalRestarts += cs.RestartCount
-			
+
 			// Check for resource-related waiting states
 			if cs.State.Waiting != nil {
 				reason := cs.State.Waiting.Reason
-				if strings.Contains(reason, "Memory") || strings.Contains(reason, "CPU") || 
-				   reason == "OOMKilled" {
+				if strings.Contains(reason, "Memory") || strings.Contains(reason, "CPU") ||
+					reason == "OOMKilled" {
 					hasResourceIssues = true
 				}
 			}
@@ -660,7 +660,7 @@ func (s *K8sDiagnosticsServer) getResourceUsage(ctx context.Context, namespace s
 
 		info.RestartCount = totalRestarts
 		info.HasResourceIssues = hasResourceIssues
-		
+
 		resourceInfo = append(resourceInfo, info)
 	}
 
@@ -670,7 +670,7 @@ func (s *K8sDiagnosticsServer) getResourceUsage(ctx context.Context, namespace s
 	return resourceInfo, nil
 }
 
-func main() {
+func runMCPServer() {
 	s := server.NewMCPServer(
 		"K8s Diagnostics MCP Server",
 		"1.0.0",
@@ -792,19 +792,19 @@ func main() {
 		}
 
 		type PodInfo struct {
-			Name         string `json:"name"`
-			Namespace    string `json:"namespace"`
-			Status       string `json:"status"`
-			Ready        string `json:"ready"`
-			Restarts     int32  `json:"restarts"`
-			Age          string `json:"age"`
+			Name      string `json:"name"`
+			Namespace string `json:"namespace"`
+			Status    string `json:"status"`
+			Ready     string `json:"ready"`
+			Restarts  int32  `json:"restarts"`
+			Age       string `json:"age"`
 		}
 
 		var podList []PodInfo
 		for _, pod := range pods.Items {
 			// Skip system namespaces unless explicitly requested
-			if !showSystem && (strings.HasPrefix(pod.Namespace, "kube-") || 
-				pod.Namespace == "kube-system" || pod.Namespace == "kube-public" || 
+			if !showSystem && (strings.HasPrefix(pod.Namespace, "kube-") ||
+				pod.Namespace == "kube-system" || pod.Namespace == "kube-public" ||
 				pod.Namespace == "kube-node-lease") {
 				continue
 			}
@@ -859,9 +859,9 @@ func main() {
 		}
 
 		response := map[string]interface{}{
-			"search_criteria": criteria,
-			"namespace": namespace,
-			"problem_count": len(result),
+			"search_criteria":  criteria,
+			"namespace":        namespace,
+			"problem_count":    len(result),
 			"problematic_pods": result,
 		}
 
@@ -881,7 +881,7 @@ func main() {
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
-		
+
 		namespace := req.GetString("namespace", "")
 
 		result, err := diagnostics.searchPods(ctx, pattern, namespace)
@@ -891,9 +891,9 @@ func main() {
 
 		response := map[string]interface{}{
 			"search_pattern": pattern,
-			"namespace": namespace,
-			"matches_found": len(result),
-			"matching_pods": result,
+			"namespace":      namespace,
+			"matches_found":  len(result),
+			"matching_pods":  result,
 		}
 
 		jsonBytes, _ := json.MarshalIndent(response, "", "  ")
@@ -917,9 +917,9 @@ func main() {
 		}
 
 		response := map[string]interface{}{
-			"namespace": namespace,
-			"sort_by": sortBy,
-			"pod_count": len(result),
+			"namespace":      namespace,
+			"sort_by":        sortBy,
+			"pod_count":      len(result),
 			"resource_usage": result,
 		}
 
@@ -945,20 +945,20 @@ func main() {
 			return mcp.NewToolResultErrorFromErr("failed to find critical pods", err), nil
 		}
 
-		// Find high restart pods  
+		// Find high restart pods
 		restartingPods, err := diagnostics.findProblematicPods(ctx, "", "restarting")
 		if err != nil {
 			return mcp.NewToolResultErrorFromErr("failed to find restarting pods", err), nil
 		}
 
 		response := map[string]interface{}{
-			"timestamp": time.Now(),
-			"cluster_health": clusterHealth,
-			"critical_pods": criticalPods,
+			"timestamp":       time.Now(),
+			"cluster_health":  clusterHealth,
+			"critical_pods":   criticalPods,
 			"restarting_pods": restartingPods,
 			"immediate_actions": []string{
 				"Check critical/failing pods first",
-				"Investigate high restart count pods", 
+				"Investigate high restart count pods",
 				"Review cluster resource availability",
 				"Check node health status",
 			},
@@ -1077,10 +1077,10 @@ This server is designed to work alongside:
 - Create GitHub issues for follow-up actions
 `
 
-	guideResource := mcp.NewResource("k8s://diagnostics/guide", 
-		"Comprehensive Kubernetes diagnostics guide", 
+	guideResource := mcp.NewResource("k8s://diagnostics/guide",
+		"Comprehensive Kubernetes diagnostics guide",
 		mcp.WithMIMEType("text/markdown"))
-	
+
 	s.AddResource(guideResource, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		return []mcp.ResourceContents{
 			mcp.TextResourceContents{

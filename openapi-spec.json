@@ -1,0 +1,827 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Kubernetes Diagnostics MCP Server API",
+    "version": "1.0.0",
+    "description": "A comprehensive Kubernetes cluster diagnostics and troubleshooting API that provides pod analysis, cluster health monitoring, log analysis, and resource usage insights.",
+    "contact": {
+      "name": "K8s Diagnostics MCP Server",
+      "url": "https://github.com/himanshusharma89/k8s-diagnostics-mcp-server"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://your-app-name.railway.app",
+      "description": "Production server (replace with your actual deployment URL)"
+    },
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/diagnose_pod": {
+      "post": {
+        "summary": "Diagnose issues with a specific Kubernetes pod",
+        "description": "Performs detailed analysis of a specific pod including container status, restart counts, resource configuration, recent events, and provides suggestions for common issues.",
+        "operationId": "diagnosePod",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pod_name"],
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "description": "Namespace of the pod",
+                    "default": "default",
+                    "example": "default"
+                  },
+                  "pod_name": {
+                    "type": "string",
+                    "description": "Name of the pod to diagnose",
+                    "example": "my-app-pod-123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful pod diagnosis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Pod name"
+                    },
+                    "namespace": {
+                      "type": "string",
+                      "description": "Pod namespace"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Pod status (Running, Pending, Failed, etc.)"
+                    },
+                    "restart_count": {
+                      "type": "integer",
+                      "description": "Total restart count across all containers"
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "List of identified issues"
+                    },
+                    "suggestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "List of suggestions to resolve issues"
+                    },
+                    "recent_events": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Recent events related to the pod"
+                    },
+                    "resources": {
+                      "type": "object",
+                      "description": "Resource configuration for containers"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Timestamp of diagnosis"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters"
+          },
+          "404": {
+            "description": "Pod not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/analyze_cluster_health": {
+      "post": {
+        "summary": "Analyze overall cluster health and identify issues",
+        "description": "Provides cluster-wide health analysis including node status, namespace statistics, problem pod identification, resource usage metrics, and recommendations for cluster improvements.",
+        "operationId": "analyzeClusterHealth",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful cluster health analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "node_count": {
+                      "type": "integer",
+                      "description": "Total number of nodes in the cluster"
+                    },
+                    "healthy_nodes": {
+                      "type": "integer",
+                      "description": "Number of healthy nodes"
+                    },
+                    "namespace_count": {
+                      "type": "integer",
+                      "description": "Total number of namespaces"
+                    },
+                    "pod_issues": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PodDiagnostic"
+                      },
+                      "description": "List of pods with issues"
+                    },
+                    "resource_usage": {
+                      "type": "object",
+                      "description": "Cluster resource usage metrics"
+                    },
+                    "recommendations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Recommendations for cluster improvements"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Timestamp of analysis"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/analyze_pod_logs": {
+      "post": {
+        "summary": "Get and analyze pod logs for common error patterns",
+        "description": "Advanced log analysis with pattern detection including error identification, warning detection, contextual suggestions, and statistical analysis of log issues.",
+        "operationId": "analyzePodLogs",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pod_name"],
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "description": "Kubernetes namespace",
+                    "default": "default",
+                    "example": "default"
+                  },
+                  "pod_name": {
+                    "type": "string",
+                    "description": "Name of the pod",
+                    "example": "my-app-pod-123"
+                  },
+                  "container": {
+                    "type": "string",
+                    "description": "Container name (optional, uses first container if not specified)",
+                    "example": "app-container"
+                  },
+                  "lines": {
+                    "type": "integer",
+                    "description": "Number of log lines to retrieve",
+                    "default": 100,
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "example": 100
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful log analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pod_name": {
+                      "type": "string",
+                      "description": "Pod name"
+                    },
+                    "namespace": {
+                      "type": "string",
+                      "description": "Pod namespace"
+                    },
+                    "log_lines": {
+                      "type": "integer",
+                      "description": "Number of log lines analyzed"
+                    },
+                    "errors_found": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "List of errors found in logs"
+                    },
+                    "suggestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Suggestions based on log analysis"
+                    },
+                    "error_count": {
+                      "type": "integer",
+                      "description": "Total number of errors found"
+                    },
+                    "warning_count": {
+                      "type": "integer",
+                      "description": "Total number of warnings found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters"
+          },
+          "404": {
+            "description": "Pod not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/list_pods": {
+      "post": {
+        "summary": "List all pods in a namespace with their status",
+        "description": "Lists pods with status information including pod status, readiness, restart counts, age information, and namespace filtering.",
+        "operationId": "listPods",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "description": "Namespace to list pods from",
+                    "default": "default",
+                    "example": "default"
+                  },
+                  "show_system": {
+                    "type": "boolean",
+                    "description": "Include system namespaces",
+                    "default": false,
+                    "example": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful pod listing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "namespace": {
+                      "type": "string",
+                      "description": "Namespace that was searched"
+                    },
+                    "pod_count": {
+                      "type": "integer",
+                      "description": "Number of pods found"
+                    },
+                    "pods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Pod name"
+                          },
+                          "namespace": {
+                            "type": "string",
+                            "description": "Pod namespace"
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "Pod status"
+                          },
+                          "ready": {
+                            "type": "string",
+                            "description": "Ready containers count (e.g., '2/3')"
+                          },
+                          "restarts": {
+                            "type": "integer",
+                            "description": "Total restart count"
+                          },
+                          "age": {
+                            "type": "string",
+                            "description": "Pod age"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/find_problematic_pods": {
+      "post": {
+        "summary": "Find and diagnose pods with issues",
+        "description": "Finds pods with specific issues including failing pods, restarting pods, not ready pods, resource-related issues, image pull issues, or all problematic pods.",
+        "operationId": "findProblematicPods",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "description": "Namespace to search (empty for all non-system namespaces)",
+                    "example": "default"
+                  },
+                  "criteria": {
+                    "type": "string",
+                    "description": "Type of problems to find",
+                    "enum": ["failing", "restarting", "not-ready", "resource-issues", "image-issues", "all"],
+                    "default": "all",
+                    "example": "all"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful problematic pod search",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "search_criteria": {
+                      "type": "string",
+                      "description": "Criteria used for search"
+                    },
+                    "namespace": {
+                      "type": "string",
+                      "description": "Namespace that was searched"
+                    },
+                    "problem_count": {
+                      "type": "integer",
+                      "description": "Number of problematic pods found"
+                    },
+                    "problematic_pods": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PodDiagnostic"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/get_resource_usage": {
+      "post": {
+        "summary": "Get resource usage overview for pods",
+        "description": "Analyzes resource usage across pods including CPU and memory requests/limits, restart counts, resource issues detection, and sorting options.",
+        "operationId": "getResourceUsage",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "description": "Namespace to analyze (empty for all non-system namespaces)",
+                    "example": "default"
+                  },
+                  "sort_by": {
+                    "type": "string",
+                    "description": "Sort results by",
+                    "enum": ["restarts", "cpu", "memory"],
+                    "default": "restarts",
+                    "example": "restarts"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful resource usage analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "namespace": {
+                      "type": "string",
+                      "description": "Namespace that was analyzed"
+                    },
+                    "sort_by": {
+                      "type": "string",
+                      "description": "Sort criteria used"
+                    },
+                    "pod_count": {
+                      "type": "integer",
+                      "description": "Number of pods analyzed"
+                    },
+                    "resource_usage": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PodResourceInfo"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/quick_triage": {
+      "post": {
+        "summary": "Perform quick cluster triage",
+        "description": "Performs quick cluster triage to identify immediate issues across all namespaces including cluster health overview, critical/failing pod identification, and high restart pod detection.",
+        "operationId": "quickTriage",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful cluster triage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Timestamp of triage"
+                    },
+                    "cluster_health": {
+                      "$ref": "#/components/schemas/ClusterHealth"
+                    },
+                    "critical_pods": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PodDiagnostic"
+                      },
+                      "description": "Critical/failing pods"
+                    },
+                    "restarting_pods": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PodDiagnostic"
+                      },
+                      "description": "High restart count pods"
+                    },
+                    "immediate_actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Recommended immediate actions"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/get_workload_recommendations": {
+      "post": {
+        "summary": "Get optimization recommendations for workloads",
+        "description": "Analyzes workloads (deployments) for best practices including resource requests and limits, replica counts for HA, health probe configurations, and security recommendations.",
+        "operationId": "getWorkloadRecommendations",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "namespace": {
+                    "type": "string",
+                    "description": "Namespace to scan",
+                    "default": "default",
+                    "example": "default"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful workload recommendations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "List of optimization recommendations"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/search_pods": {
+      "post": {
+        "summary": "Search for pods by name pattern or labels",
+        "description": "Searches for pods by name pattern, namespace, or labels and provides diagnostics for matching pods.",
+        "operationId": "searchPods",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pattern"],
+                "properties": {
+                  "pattern": {
+                    "type": "string",
+                    "description": "Search pattern (pod name, namespace, or label value)",
+                    "example": "my-app"
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Namespace to search (empty for all non-system namespaces)",
+                    "example": "default"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful pod search",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "search_pattern": {
+                      "type": "string",
+                      "description": "Pattern used for search"
+                    },
+                    "namespace": {
+                      "type": "string",
+                      "description": "Namespace that was searched"
+                    },
+                    "matches_found": {
+                      "type": "integer",
+                      "description": "Number of matching pods found"
+                    },
+                    "matching_pods": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PodDiagnostic"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid parameters"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PodDiagnostic": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Pod name"
+          },
+          "namespace": {
+            "type": "string",
+            "description": "Pod namespace"
+          },
+          "status": {
+            "type": "string",
+            "description": "Pod status"
+          },
+          "restart_count": {
+            "type": "integer",
+            "description": "Total restart count"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of identified issues"
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of suggestions to resolve issues"
+          },
+          "recent_events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Recent events related to the pod"
+          },
+          "resources": {
+            "type": "object",
+            "description": "Resource configuration for containers"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of diagnosis"
+          }
+        }
+      },
+      "ClusterHealth": {
+        "type": "object",
+        "properties": {
+          "node_count": {
+            "type": "integer",
+            "description": "Total number of nodes"
+          },
+          "healthy_nodes": {
+            "type": "integer",
+            "description": "Number of healthy nodes"
+          },
+          "namespace_count": {
+            "type": "integer",
+            "description": "Total number of namespaces"
+          },
+          "pod_issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PodDiagnostic"
+            },
+            "description": "List of pods with issues"
+          },
+          "resource_usage": {
+            "type": "object",
+            "description": "Cluster resource usage metrics"
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Recommendations for improvements"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of analysis"
+          }
+        }
+      },
+      "PodResourceInfo": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Pod name"
+          },
+          "namespace": {
+            "type": "string",
+            "description": "Pod namespace"
+          },
+          "cpu_request": {
+            "type": "string",
+            "description": "CPU request"
+          },
+          "memory_request": {
+            "type": "string",
+            "description": "Memory request"
+          },
+          "cpu_limit": {
+            "type": "string",
+            "description": "CPU limit"
+          },
+          "memory_limit": {
+            "type": "string",
+            "description": "Memory limit"
+          },
+          "restart_count": {
+            "type": "integer",
+            "description": "Restart count"
+          },
+          "status": {
+            "type": "string",
+            "description": "Pod status"
+          },
+          "has_resource_issues": {
+            "type": "boolean",
+            "description": "Whether pod has resource-related issues"
+          }
+        }
+      }
+    }
+  }
+} 
