@@ -11,8 +11,8 @@
   },
   "servers": [
     {
-      "url": "https://your-app-name.railway.app",
-      "description": "Production server (replace with your actual deployment URL)"
+      "url": "https://k8s-diagnostics-mcp-server.onrender.com",
+      "description": "Production server on Render"
     },
     {
       "url": "http://localhost:8080",

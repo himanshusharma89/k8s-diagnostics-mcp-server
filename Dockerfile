@@ -28,8 +28,9 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 # Copy the binary
 COPY --from=builder /app/bin/k8s-diagnostics-mcp-server /k8s-diagnostics-mcp-server
 
-# Set environment variable to run as HTTP server
+# Set environment variables
 ENV HTTP_MODE=true
+ENV DEMO_MODE=true
 
 # Expose port (if needed for your MCP setup)
 EXPOSE 8080
