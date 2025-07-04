@@ -1,6 +1,6 @@
 # Kubernetes Diagnostics MCP Server
 
-A Model Context Protocol (MCP) server specifically designed for **intelligent Kubernetes troubleshooting and diagnostics**. Built by InfraCloud to complement existing K8s management tools with advanced debugging capabilities.
+A Model Context Protocol (MCP) server specifically designed for **intelligent Kubernetes troubleshooting and diagnostics**. Built to complement existing K8s management tools with advanced debugging capabilities.
 
 ## 🚀 Features
 
@@ -136,7 +136,7 @@ Unlike existing Kubernetes MCP servers that focus on basic cluster management, t
 
 ## 🤝 Contributing
 
-We welcome contributions! This project aligns with InfraCloud's commitment to the CNCF ecosystem and open-source community.
+We welcome contributions! This project aligns with our commitment to the CNCF ecosystem and open-source community.
 
 ### Development
 ```bash
@@ -152,7 +152,7 @@ go build -ldflags="-s -w" -o k8s-diagnostics-mcp
 
 ## 📞 Support
 
-- **InfraCloud Blog**: Check our [technical blog](https://www.infracloud.io/blogs/) for K8s best practices
+- **Project Blog**: Check our [technical blog](https://www.infracloud.io/blogs/) for K8s best practices
 - **GitHub Issues**: Report bugs and feature requests
 - **CNCF Community**: Engage with the broader Kubernetes community
 
@@ -162,4 +162,4 @@ go build -ldflags="-s -w" -o k8s-diagnostics-mcp
 
 ---
 
-**Built with ❤️ by [InfraCloud](https://www.infracloud.io) for the CNCF community**
+**Built with ❤️ for the CNCF community**
